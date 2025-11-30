@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, FormEvent } from 'react';
+import React, { useState, useRef, useEffect, useCallback, FormEvent } from 'react';
 import { Search, User, MapPin, Hash, AlertCircle, ShieldCheck } from 'lucide-react';
 
 // --- Types ---
@@ -9,6 +9,72 @@ interface Student {
   name: string;
   roll: string;
   hometown: string;
+}
+
+interface TurnstileProps {
+  siteKey: string;
+  onSuccess: (token: string) => void;
+  onExpire: () => void;
+  theme?: 'light' | 'dark' | 'auto';
+}
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        container: HTMLElement,
+        options: {
+          sitekey: string;
+          theme?: string;
+          callback: (token: string) => void;
+          'expired-callback': () => void;
+        }
+      ) => string;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
+
+// --- Custom Turnstile Component ---
+// Self-contained to avoid external dependency build errors
+function Turnstile({ siteKey, onSuccess, onExpire, theme = 'light' }: TurnstileProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const widgetId = useRef<string | null>(null);
+
+  useEffect(() => {
+    let script = document.querySelector('script[src^="https://challenges.cloudflare.com/turnstile/v0/api.js"]') as HTMLScriptElement | null;
+    
+    const renderWidget = () => {
+      if (window.turnstile && containerRef.current && !widgetId.current) {
+        widgetId.current = window.turnstile.render(containerRef.current, {
+          sitekey: siteKey,
+          theme: theme,
+          callback: (token: string) => onSuccess(token),
+          'expired-callback': () => onExpire(),
+        });
+      }
+    };
+
+    if (!script) {
+      script = document.createElement('script');
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+      script.onload = () => renderWidget();
+    } else if (window.turnstile) {
+      renderWidget();
+    }
+
+    return () => {
+      if (window.turnstile && widgetId.current) {
+        window.turnstile.remove(widgetId.current);
+        widgetId.current = null;
+      }
+    };
+  }, [siteKey, onSuccess, onExpire, theme]);
+
+  return <div ref={containerRef} className="min-h-[65px]" />;
 }
 
 // --- Main Application ---
@@ -21,24 +87,50 @@ export default function StudentSearch() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [hasSearched, setHasSearched] = useState<boolean>(false);
   
-  // Updated with your specific Worker URL
+  // Security Token State
+  const [token, setToken] = useState<string | null>(null);
+  
   const WORKER_URL = 'https://studentsearch-oa.ketan-saini62.workers.dev';
+
+  // Stable handlers to prevent widget reloading
+  const handleTurnstileSuccess = useCallback((t: string) => {
+    setToken(t);
+    setError('');
+  }, []);
+
+  const handleTurnstileExpire = useCallback(() => {
+    setToken(null);
+  }, []);
 
   const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
     
+    // Check if token exists
+    if (!token) {
+        setError('Please verify you are human first.');
+        return;
+    }
+
     setLoading(true);
     setError('');
     setResults([]);
     setHasSearched(true);
 
     try {
-      // Removed headers object since we no longer send the token
-      const res = await fetch(`${WORKER_URL}?id=${encodeURIComponent(query)}`);
+      // Send token in header
+      const res = await fetch(`${WORKER_URL}?id=${encodeURIComponent(query)}`, {
+        headers: {
+            'x-turnstile-token': token
+        }
+      });
       
+      if (res.status === 401 || res.status === 403) {
+          setToken(null);
+          throw new Error('Security check failed. Please try again.');
+      }
+
       if (!res.ok) {
-        // This helps debug if the error is 403 (CORS/Origin) or 500 (Server)
         throw new Error(`Connection failed: ${res.status} ${res.statusText}`);
       }
       
@@ -96,11 +188,21 @@ export default function StudentSearch() {
             />
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !token}
               className="absolute right-2 top-2 bottom-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg px-6 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
               {loading ? 'Accessing...' : 'Scan'}
             </button>
+          </div>
+          
+          {/* Turnstile Widget */}
+          <div className="flex justify-center h-[65px]">
+            <Turnstile
+                siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'}
+                theme="dark"
+                onSuccess={handleTurnstileSuccess}
+                onExpire={handleTurnstileExpire}
+            />
           </div>
         </form>
 
