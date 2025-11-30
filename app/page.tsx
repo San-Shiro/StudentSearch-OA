@@ -74,10 +74,10 @@ export default function StudentSearch() {
         {/* Header */}
         <div className="text-center">
           <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 tracking-tight">
-            NEXUS SEARCH
+            Student Search Lite
           </h1>
           <p className="mt-2 text-slate-400">
-            Secure Gateway // IITK Database
+            IITK Database
           </p>
         </div>
 
