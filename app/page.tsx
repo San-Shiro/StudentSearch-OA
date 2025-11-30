@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, FormEvent } from 'react';
+import React, { useState, useRef, useEffect, useCallback, FormEvent } from 'react';
 import { Search, User, MapPin, Hash, AlertCircle, ShieldCheck } from 'lucide-react';
 
 // --- Types ---
@@ -97,6 +97,17 @@ export default function StudentSearch() {
   // Updated with your specific Worker URL
   const WORKER_URL = 'https://studentsearch-oa.ketan-saini62.workers.dev';
 
+  // FIX 1: Use useCallback to keep these functions stable.
+  // This prevents the Turnstile widget from resetting on every keystroke.
+  const handleTurnstileSuccess = useCallback((t: string) => {
+    setToken(t);
+    setError('');
+  }, []);
+
+  const handleTurnstileExpire = useCallback(() => {
+    setToken(null);
+  }, []);
+
   const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -140,6 +151,8 @@ export default function StudentSearch() {
 
     } catch (err) {
       if (err instanceof Error) {
+        // Detailed error for debugging
+        console.error("Search Error:", err);
         setError(err.message);
       } else {
         setError('Something went wrong.');
@@ -188,13 +201,11 @@ export default function StudentSearch() {
           {/* TURNSTILE WIDGET (Custom Implementation) */}
           <div className="flex justify-center h-[65px]">
             <Turnstile
+                // Fallback key is for TEST MODE only. If you see Test Mode, your Env Var is missing.
                 siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'}
                 theme="dark"
-                onSuccess={(t) => {
-                    setToken(t);
-                    setError('');
-                }}
-                onExpire={() => setToken(null)}
+                onSuccess={handleTurnstileSuccess} // Updated to use stable reference
+                onExpire={handleTurnstileExpire}   // Updated to use stable reference
             />
           </div>
         </form>
