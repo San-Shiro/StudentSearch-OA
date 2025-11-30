@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback, FormEvent } from 'react';
+import React, { useState, FormEvent } from 'react';
 import { Search, User, MapPin, Hash, AlertCircle, ShieldCheck } from 'lucide-react';
 
 // --- Types ---
@@ -9,78 +9,6 @@ interface Student {
   name: string;
   roll: string;
   hometown: string;
-}
-
-interface TurnstileProps {
-  siteKey: string;
-  onSuccess: (token: string) => void;
-  onExpire: () => void;
-  theme?: 'light' | 'dark' | 'auto';
-}
-
-// Extend the Window interface to include Cloudflare's Turnstile global
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (
-        container: HTMLElement,
-        options: {
-          sitekey: string;
-          theme?: string;
-          callback: (token: string) => void;
-          'expired-callback': () => void;
-        }
-      ) => string;
-      remove: (widgetId: string) => void;
-    };
-  }
-}
-
-// --- Custom Turnstile Component ---
-
-function Turnstile({ siteKey, onSuccess, onExpire, theme = 'light' }: TurnstileProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const widgetId = useRef<string | null>(null);
-
-  useEffect(() => {
-    // 1. Check if script is already present
-    let script = document.querySelector('script[src^="https://challenges.cloudflare.com/turnstile/v0/api.js"]') as HTMLScriptElement | null;
-    
-    // 2. Define render function
-    const renderWidget = () => {
-      if (window.turnstile && containerRef.current && !widgetId.current) {
-        widgetId.current = window.turnstile.render(containerRef.current, {
-          sitekey: siteKey,
-          theme: theme,
-          callback: (token: string) => onSuccess(token),
-          'expired-callback': () => onExpire(),
-        });
-      }
-    };
-
-    // 3. Load script if not present
-    if (!script) {
-      script = document.createElement('script');
-      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-      script.onload = () => renderWidget();
-    } else if (window.turnstile) {
-      // Script already loaded
-      renderWidget();
-    }
-
-    return () => {
-      // Cleanup
-      if (window.turnstile && widgetId.current) {
-        window.turnstile.remove(widgetId.current);
-        widgetId.current = null;
-      }
-    };
-  }, [siteKey, onSuccess, onExpire, theme]);
-
-  return <div ref={containerRef} className="min-h-[65px]" />;
 }
 
 // --- Main Application ---
@@ -92,49 +20,27 @@ export default function StudentSearch() {
   const [error, setError] = useState<string>('');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [hasSearched, setHasSearched] = useState<boolean>(false);
-  const [token, setToken] = useState<string | null>(null);
   
   // Updated with your specific Worker URL
   const WORKER_URL = 'https://studentsearch-oa.ketan-saini62.workers.dev';
-
-  // FIX 1: Use useCallback to keep these functions stable.
-  // This prevents the Turnstile widget from resetting on every keystroke.
-  const handleTurnstileSuccess = useCallback((t: string) => {
-    setToken(t);
-    setError('');
-  }, []);
-
-  const handleTurnstileExpire = useCallback(() => {
-    setToken(null);
-  }, []);
 
   const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
     
-    if (!token) {
-      setError('Verifying security... please wait a moment.');
-      return;
-    }
-
     setLoading(true);
     setError('');
     setResults([]);
     setHasSearched(true);
 
     try {
-      const res = await fetch(`${WORKER_URL}?id=${encodeURIComponent(query)}`, {
-        headers: {
-            'x-turnstile-token': token
-        }
-      });
+      // Removed headers object since we no longer send the token
+      const res = await fetch(`${WORKER_URL}?id=${encodeURIComponent(query)}`);
       
-      if (res.status === 403 || res.status === 401) {
-          setToken(null);
-          throw new Error('Security check failed or token expired. Please retry.');
+      if (!res.ok) {
+        // This helps debug if the error is 403 (CORS/Origin) or 500 (Server)
+        throw new Error(`Connection failed: ${res.status} ${res.statusText}`);
       }
-
-      if (!res.ok) throw new Error('Failed to connect to search service');
       
       const str = await res.text();
       const parser = new DOMParser();
@@ -151,7 +57,6 @@ export default function StudentSearch() {
 
     } catch (err) {
       if (err instanceof Error) {
-        // Detailed error for debugging
         console.error("Search Error:", err);
         setError(err.message);
       } else {
@@ -191,22 +96,11 @@ export default function StudentSearch() {
             />
             <button
               type="submit"
-              disabled={loading || !token}
+              disabled={loading}
               className="absolute right-2 top-2 bottom-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg px-6 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
               {loading ? 'Accessing...' : 'Scan'}
             </button>
-          </div>
-
-          {/* TURNSTILE WIDGET (Custom Implementation) */}
-          <div className="flex justify-center h-[65px]">
-            <Turnstile
-                // Fallback key is for TEST MODE only. If you see Test Mode, your Env Var is missing.
-                siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'}
-                theme="dark"
-                onSuccess={handleTurnstileSuccess} // Updated to use stable reference
-                onExpire={handleTurnstileExpire}   // Updated to use stable reference
-            />
           </div>
         </form>
 
