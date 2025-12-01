@@ -11,9 +11,11 @@ interface Student {
 }
 
 // --- Config Flag ---
-// Set to "disabled" to bypass login and show the search page (guest mode).
-// Set to "enabled" to require CC login.
-const requireAuthentication = "enabled"; // <-- change this to "disabled" to enable guest mode
+// This reads from NEXT_PUBLIC_REQUIRE_AUTH if present, otherwise falls back to "enabled".
+// Valid values: "enabled" | "disabled"
+const requireAuthenticationEnv = (process.env.NEXT_PUBLIC_REQUIRE_AUTH || '') as string;
+const requireAuthentication: "enabled" | "disabled" =
+  requireAuthenticationEnv === "disabled" ? "disabled" : "enabled";
 
 // --- Main Application ---
 export default function StudentSearch() {
@@ -76,7 +78,7 @@ export default function StudentSearch() {
     checkSession();
 
     return () => { mounted = false; };
-  }, [requireAuthentication]); // <-- important: reacts when flag changes
+  }, [requireAuthentication]); // reacts to changes in the flag
 
   // --- 2. Login Handler ---
   const handleLogin = async (e: FormEvent) => {
