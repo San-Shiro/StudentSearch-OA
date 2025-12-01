@@ -11,6 +11,11 @@ interface Student {
   hometown: string;
 }
 
+// --- Config Flag ---
+// Set to "disabled" to bypass login and show the search page (guest mode).
+// Set to "enabled" to require CC login.
+const requireAuthentication = "disabled"; // ★ final: authentication disabled as requested
+
 // --- Main Application ---
 
 export default function StudentSearch() {
@@ -35,6 +40,13 @@ export default function StudentSearch() {
   useEffect(() => {
     const checkSession = async () => {
       try {
+        // ★ NEW: Skip login if authentication disabled (guest mode)
+        if (requireAuthentication === "disabled") {
+          setIsAuthenticated(true);
+          setIsCheckingAuth(false);
+          return;
+        }
+
         // We hit the worker with credentials: 'include' to send the cookie
         const res = await fetch(`${WORKER_URL}?check_auth=true`, {
           credentials: 'include', 
@@ -171,8 +183,9 @@ export default function StudentSearch() {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-800 mb-4 text-blue-500 ring-1 ring-slate-700">
               <Lock className="w-8 h-8" />
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">System Access</h1>
-            <p className="text-slate-500 text-sm mt-2">Identify yourself</p>
+            {/* ★ UPDATED: Login page title + helper text */}
+            <h1 className="text-2xl font-bold text-white tracking-tight">IITK Student Search</h1>
+            <p className="text-slate-500 text-sm mt-2">Use CC Login to access</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
@@ -233,7 +246,7 @@ export default function StudentSearch() {
     );
   }
 
-  // --- View: Search Screen (Only shown if isAuthenticated) ---
+  // --- View: Search Screen (Shown when isAuthenticated) ---
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 flex flex-col items-center py-12 px-4 font-sans">
       <div className="w-full max-w-3xl space-y-8">
@@ -245,9 +258,23 @@ export default function StudentSearch() {
                 <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 tracking-tight">
                     Student Search Lite
                 </h1>
+
+                {/* Subtitle (kept as requested) */}
                 <p className="mt-2 text-slate-400 text-sm tracking-widest uppercase">
                     Something is better than nothing
                 </p>
+
+                {/* ★ NEW: Notice line about upcoming CC login requirement */}
+                <p className="mt-1 text-slate-500 text-xs">
+                  Note: After the next update, CC login will be required to access this page to secure the data.
+                </p>
+
+                {/* ★ NEW: Guest mode label when auth is bypassed */}
+                {requireAuthentication === "disabled" && (
+                  <div className="inline-block mt-3 px-3 py-1 rounded-full text-xs font-medium bg-yellow-800/30 text-yellow-200 border border-yellow-700/40">
+                    Guest mode — authentication bypassed
+                  </div>
+                )}
             </div>
             <button 
                 onClick={handleLogout}
