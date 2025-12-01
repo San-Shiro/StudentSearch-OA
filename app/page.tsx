@@ -243,10 +243,10 @@ export default function StudentSearch() {
             <div className="w-10"></div> {/* Spacer */}
             <div className="text-center flex-1">
                 <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 tracking-tight">
-                    NEXUS SEARCH
+                    Student Search Lite
                 </h1>
                 <p className="mt-2 text-slate-400 text-sm tracking-widest uppercase">
-                    Secure Gateway Active
+                    Something is better than nothing
                 </p>
             </div>
             <button 
