@@ -29,7 +29,7 @@ export default function StudentSearch() {
   const [error, setError] = useState<string>('');
   
   // Use the worker URL (ensure this matches your deployed worker)
-  const WORKER_URL = 'https://studentsearch-oa.ketan-saini62.workers.dev';
+  const WORKER_URL = 'https://student-search-oa.chinshoe-up.workers.dev/';
 
   // --- 1. Check Auth on Load ---
   useEffect(() => {
