@@ -14,7 +14,7 @@ interface Student {
 // --- Config Flag ---
 // Set to "disabled" to bypass login and show the search page (guest mode).
 // Set to "enabled" to require CC login.
-const requireAuthentication = "disabled"; // ★ final: authentication disabled as requested
+const requireAuthentication = "enabled"; // ★ final: authentication disabled as requested
 
 // --- Main Application ---
 
