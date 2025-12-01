@@ -283,9 +283,11 @@ export default function StudentSearch() {
                 </p>
 
                 {/* Improved notice line */}
-                <p className="mt-1 text-slate-500 text-xs">
-                  Note: After the next update, CC login will be required to access this page to secure the data.
-                </p>
+                {requireAuthentication === "disabled" && (
+                  <div className="inline-block mt-3 px-3 py-1 rounded-full text-xs font-medium bg-yellow-800/30 text-yellow-200 border border-yellow-700/40">
+                    Guest mode — authentication bypassed
+                  </div>
+                )}
 
                 {/* Guest mode label when auth is bypassed */}
                 {requireAuthentication === "disabled" && (
