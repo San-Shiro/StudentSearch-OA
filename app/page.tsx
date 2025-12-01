@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, FormEvent } from 'react';
 import { Search, User, MapPin, Hash, AlertCircle, ShieldCheck, Lock, KeyRound, ArrowRight, LogOut } from 'lucide-react';
 
 // --- Types ---
-
 interface Student {
   name: string;
   roll: string;
@@ -14,10 +13,9 @@ interface Student {
 // --- Config Flag ---
 // Set to "disabled" to bypass login and show the search page (guest mode).
 // Set to "enabled" to require CC login.
-const requireAuthentication = "enabled"; // ★ final: authentication disabled as requested
+const requireAuthentication = "enabled"; // <-- change this to "disabled" to enable guest mode
 
 // --- Main Application ---
-
 export default function StudentSearch() {
   // --- Auth State ---
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -36,32 +34,49 @@ export default function StudentSearch() {
   // Use the worker URL (ensure this matches your deployed worker)
   const WORKER_URL = 'https://student-search-oa.chinshoe-up.workers.dev/';
 
-  // --- 1. Check Auth on Load ---
+  // --- 1. Check Auth on Load and when requireAuthentication changes ---
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        // ★ NEW: Skip login if authentication disabled (guest mode)
-        if (requireAuthentication === "disabled") {
-          setIsAuthenticated(true);
-          setIsCheckingAuth(false);
-          return;
-        }
+    let mounted = true;
 
-        // We hit the worker with credentials: 'include' to send the cookie
+    const checkSession = async () => {
+      // If guest mode is enabled, immediately set authenticated and skip session check
+      if (requireAuthentication === "disabled") {
+        if (!mounted) return;
+        setIsAuthenticated(true);
+        setIsCheckingAuth(false);
+        return;
+      }
+
+      // For "enabled" mode: ensure we start unauthenticated and show loading while checking
+      if (!mounted) return;
+      setIsAuthenticated(false);
+      setIsCheckingAuth(true);
+
+      try {
         const res = await fetch(`${WORKER_URL}?check_auth=true`, {
-          credentials: 'include', 
+          credentials: 'include',
         });
+
+        if (!mounted) return;
         if (res.ok) {
           setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
         }
       } catch (e) {
         console.log("Session check failed", e);
+        if (!mounted) return;
+        setIsAuthenticated(false);
       } finally {
+        if (!mounted) return;
         setIsCheckingAuth(false);
       }
     };
+
     checkSession();
-  }, []);
+
+    return () => { mounted = false; };
+  }, [requireAuthentication]); // <-- important: reacts when flag changes
 
   // --- 2. Login Handler ---
   const handleLogin = async (e: FormEvent) => {
@@ -78,7 +93,6 @@ export default function StudentSearch() {
       const res = await fetch(WORKER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // IMPORTANT: This tells the browser to accept the Set-Cookie header
         credentials: 'include', 
         body: JSON.stringify({
           action: 'login',
@@ -109,7 +123,13 @@ export default function StudentSearch() {
             credentials: 'include',
             body: JSON.stringify({ action: 'logout' })
         });
-        setIsAuthenticated(false);
+        // On logout, respect requireAuthentication flag:
+        if (requireAuthentication === "disabled") {
+          // still in guest mode: treat as authenticated guest
+          setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
+        }
         setResults([]);
         setQuery('');
     } catch (e) {
@@ -127,8 +147,6 @@ export default function StudentSearch() {
     setResults([]);
 
     try {
-      // We assume the cookie is set, so we just fetch.
-      // The Worker will check the cookie header.
       const res = await fetch(`${WORKER_URL}?id=${encodeURIComponent(query)}`, {
         credentials: 'include' 
       });
@@ -176,14 +194,12 @@ export default function StudentSearch() {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col items-center justify-center py-12 px-4 font-sans">
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
-          {/* Decorative background element */}
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-emerald-500"></div>
           
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-800 mb-4 text-blue-500 ring-1 ring-slate-700">
               <Lock className="w-8 h-8" />
             </div>
-            {/* ★ UPDATED: Login page title + helper text */}
             <h1 className="text-2xl font-bold text-white tracking-tight">IITK Student Search</h1>
             <p className="text-slate-500 text-sm mt-2">Use CC Login to access</p>
           </div>
@@ -259,17 +275,17 @@ export default function StudentSearch() {
                     Student Search Lite
                 </h1>
 
-                {/* Subtitle (kept as requested) */}
+                {/* Subtitle */}
                 <p className="mt-2 text-slate-400 text-sm tracking-widest uppercase">
                     Something is better than nothing
                 </p>
 
-                {/* ★ NEW: Notice line about upcoming CC login requirement */}
+                {/* Improved notice line */}
                 <p className="mt-1 text-slate-500 text-xs">
                   Note: After the next update, CC login will be required to access this page to secure the data.
                 </p>
 
-                {/* ★ NEW: Guest mode label when auth is bypassed */}
+                {/* Guest mode label when auth is bypassed */}
                 {requireAuthentication === "disabled" && (
                   <div className="inline-block mt-3 px-3 py-1 rounded-full text-xs font-medium bg-yellow-800/30 text-yellow-200 border border-yellow-700/40">
                     Guest mode — authentication bypassed
